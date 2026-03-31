@@ -22,6 +22,11 @@ class OverviewItem(BaseModel):
     title: str
 
 
+class FormPrefillResponse(BaseModel):
+    fields: dict[str, Any]
+    extra: dict[str, Any]
+
+
 class FileUploadResponse(BaseModel):
     file_name: str
     stored_name: str

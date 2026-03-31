@@ -36,6 +36,41 @@ function isValueEmpty(value: unknown): boolean {
   return false
 }
 
+function clearInvalidState(form: HTMLFormElement) {
+  form
+    .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('.field-control--invalid')
+    .forEach((element) => {
+      element.classList.remove('field-control--invalid')
+    })
+}
+
+function getValidationTarget(
+  element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
+  if (element.classList.contains('attach-hidden')) {
+    const attachField = element.closest('.attach-field')
+    const displayInput = attachField?.querySelector<HTMLInputElement>('.attach-display')
+    if (displayInput) {
+      return displayInput
+    }
+  }
+
+  return element
+}
+
+function markInvalid(
+  target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+) {
+  target.classList.add('field-control--invalid')
+
+  const clearHighlight = () => {
+    target.classList.remove('field-control--invalid')
+  }
+
+  target.addEventListener('input', clearHighlight, { once: true })
+  target.addEventListener('change', clearHighlight, { once: true })
+}
+
 export function useFormActions({
   formType,
   getExtraPayload,
@@ -89,6 +124,8 @@ export function useFormActions({
       return false
     }
 
+    clearInvalidState(form)
+
     const requiredElements = form.querySelectorAll<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >('[data-required="true"]')
@@ -99,7 +136,10 @@ export function useFormActions({
       }
 
       if (element.value.trim().length === 0) {
-        element.focus()
+        const target = getValidationTarget(element)
+        markInvalid(target)
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        window.setTimeout(() => target.focus(), 120)
         setTimedNotice({ type: 'error', text: 'Please fill all required fields.' })
         return false
       }
@@ -136,6 +176,7 @@ export function useFormActions({
       return
     }
 
+    clearInvalidState(form)
     form.reset()
     clearAttachmentInputs(form)
     resetExtraPayload?.()

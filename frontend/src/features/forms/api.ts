@@ -5,6 +5,11 @@ type SavePayload = {
   extra?: Record<string, unknown>
 }
 
+type PrefillResponse = {
+  fields: Record<string, unknown>
+  extra: Record<string, unknown>
+}
+
 export async function uploadAttachment(file: File) {
   const body = new FormData()
   body.append('file', file)
@@ -37,6 +42,18 @@ export async function saveFormSubmission(formType: string, payload: SavePayload)
   }
 
   return response.json()
+}
+
+export async function fetchCargoPrefill(formType: string, cargoNo: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/forms/prefill/${formType}/${encodeURIComponent(cargoNo)}`,
+  )
+
+  if (!response.ok) {
+    throw new Error('Unable to load cargo prefill data.')
+  }
+
+  return response.json() as Promise<PrefillResponse>
 }
 
 export async function fetchOverview() {

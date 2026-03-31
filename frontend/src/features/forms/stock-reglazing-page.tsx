@@ -8,38 +8,34 @@ import {
   FormSheet,
   NoticeBanner,
 } from './common'
+import { useCargoPrefill } from './use-cargo-prefill'
 import { useFormActions } from './use-form-actions'
 
+const readonlyKeys = new Set([
+  'brand',
+  'product',
+  'packing',
+  'glaze',
+  'grade',
+  'no_of_mc',
+  'qty_in_kg',
+  'price',
+])
+
 const columns = [
-  { key: 'brand', label: 'Brand' },
-  { key: 'product', label: 'Product' },
-  { key: 'packing', label: 'Packing' },
-  { key: 'glaze', label: 'Glaze' },
-  { key: 'grade', label: 'Grade' },
-  { key: 'no_of_mc', label: 'No.of.MC' },
-  { key: 'qty_in_kg', label: 'QTY in KG' },
+  { key: 'brand', label: 'Brand', editable: false },
+  { key: 'product', label: 'Product', editable: false },
+  { key: 'packing', label: 'Packing', editable: false },
+  { key: 'glaze', label: 'Glaze', editable: false },
+  { key: 'grade', label: 'Grade', editable: false },
+  { key: 'no_of_mc', label: 'No.of.MC', editable: false },
+  { key: 'qty_in_kg', label: 'QTY in KG', editable: false },
+  { key: 'price', label: 'Price', editable: false },
   { key: 'reglazing_in_qty', label: 'Reglazing in QTY' },
   { key: 'reglazing_done', label: 'Reglazing Done' },
   { key: 'reglazing_balance', label: 'Reglazing Balance' },
   { key: 'location_1_qty', label: 'Location 1 / QTY' },
   { key: 'location_2_qty', label: 'Location 2 / QTY' },
-]
-
-const sampleRows: Record<string, string>[] = [
-  {
-    brand: 'OceanPure',
-    product: 'Vannamei Shrimp',
-    packing: '1 x 10kg',
-    glaze: '10%',
-    grade: '26/30',
-    no_of_mc: '1250',
-    qty_in_kg: '12500',
-    reglazing_in_qty: '8000',
-    reglazing_done: '6200',
-    reglazing_balance: '1800',
-    location_1_qty: 'Plant 1 / 4000',
-    location_2_qty: 'Plant 2 / 2200',
-  },
 ]
 
 const makeRow = () =>
@@ -49,12 +45,31 @@ const makeRow = () =>
   }, {})
 
 export function StockReglazingPage() {
-  const [rows, setRows] = useState<Record<string, string>[]>(sampleRows)
+  const [rows, setRows] = useState<Record<string, string>[]>([makeRow()])
 
   const { formRef, notice, isSaving, handleClear, handleSave } = useFormActions({
     formType: 'stock_reglazing',
     getExtraPayload: () => ({ reglazing_rows: rows }),
     resetExtraPayload: () => setRows([makeRow()]),
+  })
+
+  useCargoPrefill({
+    formType: 'stock_reglazing',
+    formRef,
+    tableConfig: {
+      key: 'reglazing_rows',
+      setRows: (nextRows) =>
+        setRows(
+          nextRows.map((row) => ({
+            ...makeRow(),
+            ...row,
+            ...Object.fromEntries(
+              Object.entries(row).filter(([key]) => readonlyKeys.has(key)),
+            ),
+          })),
+        ),
+      makeRow,
+    },
   })
 
   return (
@@ -73,15 +88,15 @@ export function StockReglazingPage() {
           <NoticeBanner notice={notice} />
 
           <div className="form-grid form-grid--3">
-            <Field label="CARGO NO" name="cargo_no" placeholder="Enter cargo number" defaultValue="CGN-24091" />
-            <Field label="PO NO" name="po_no" placeholder="Enter po number" defaultValue="PO-8751" />
+            <Field label="CARGO NO" name="cargo_no" placeholder="Enter cargo number" />
+            <Field label="PO NO" name="po_no" placeholder="Enter po number" />
+            <Field label="INVOICE NO" name="invoice_no" placeholder="Enter invoice number" />
             <Field
               label="PLANT"
               name="plant"
               as="select"
               placeholder="Select plant"
               options={['Plant 1', 'Plant 2']}
-              defaultValue="Plant 1"
             />
             <Field
               label="BUYER NAME"
@@ -89,7 +104,6 @@ export function StockReglazingPage() {
               as="select"
               placeholder="Select buyer"
               options={['BlueWave Imports', 'Nordic Ocean Foods', 'Pacific Table Co.']}
-              defaultValue="BlueWave Imports"
             />
             <Field
               label="ASSORTMENT"
@@ -97,9 +111,7 @@ export function StockReglazingPage() {
               as="select"
               placeholder="Select assortment"
               options={['Assorted Mix', 'Premium Cut', 'Standard Bulk']}
-              defaultValue="Premium Cut"
             />
-            <div />
           </div>
 
           <div className="section-block section-block--centered">
@@ -108,7 +120,7 @@ export function StockReglazingPage() {
           </div>
 
           <ActionButtons
-            saveLabel="SAVE PURCHASE ORDER"
+            saveLabel="SAVE REGLAZING"
             showEdit
             onSave={() => void handleSave()}
             onClear={handleClear}

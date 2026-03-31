@@ -214,14 +214,17 @@ export function EditableTable({ tableName, columns, rows, onRowsChange }: Editab
                         <input
                           name={`${tableName}_${rowIndex}_${column.key}`}
                           value={row[column.key] ?? ''}
-                          onChange={(event) =>
-                            updateCell(rowIndex, column.key, event.target.value)
-                          }
+                          onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}
                           data-required="true"
                           className="table-input"
                         />
                       ) : (
-                        <span className="table-readonly">{row[column.key] ?? ''}</span>
+                        <input
+                          value={row[column.key] ?? ''}
+                          readOnly
+                          tabIndex={-1}
+                          className="table-input table-input--readonly"
+                        />
                       )}
                     </td>
                   )

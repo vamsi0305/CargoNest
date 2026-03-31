@@ -118,12 +118,21 @@ a {
 }
 
 .form-message {
-  margin: 0 0 0.85rem;
-  padding: 0.58rem 0.7rem;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1100;
+  margin: 0;
+  padding: 0.9rem 1.05rem;
   border: 1px solid transparent;
-  border-radius: 4px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  min-width: 18rem;
+  max-width: min(28rem, calc(100vw - 2rem));
+  transform: translate(-50%, -50%);
+  box-shadow: 0 18px 38px rgba(15, 15, 16, 0.2);
+  animation: toast-in 0.2s ease-out;
 }
 
 .form-message--success {
@@ -189,6 +198,11 @@ a {
   font-size: 0.82rem;
   padding: 0.62rem 0.68rem;
   outline: none;
+}
+
+.field-control--invalid {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px rgba(239, 28, 36, 0.16);
 }
 
 .field-group textarea {
@@ -268,6 +282,13 @@ a {
   background: #ffffff;
   padding: 0.35rem 0.4rem;
   font-size: 0.74rem;
+}
+
+.table-input--readonly {
+  background: #dfdfe4;
+  color: #67676f;
+  border-color: #d0d0d6;
+  cursor: default;
 }
 
 .table-readonly {
@@ -399,4 +420,23 @@ a {
     font-size: 0.62rem;
     padding: 0.33rem 0.58rem;
   }
+
+  .form-message {
+    min-width: 0;
+    width: calc(100vw - 2rem);
+  }
 }
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 12px));
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+
