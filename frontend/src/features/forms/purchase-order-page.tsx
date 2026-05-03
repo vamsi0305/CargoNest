@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import {
   ActionButtons,
@@ -11,13 +10,6 @@ import {
 } from './common'
 import { useCargoPrefill } from './use-cargo-prefill'
 import { useFormActions } from './use-form-actions'
-
-const stockLinks = [
-  { to: '/stock-reglazing', label: 'REGLAZING' },
-  { to: '/stock-repacking', label: 'REPACKING' },
-  { to: '/stock-sampling', label: 'SAMPLING' },
-  { to: '/stock-inspection', label: 'INSPECTION' },
-]
 
 const financialYears = ['2025 - 2026', '2026 - 2027', '2027 - 2028', '2028 - 2029', '2029 - 2030']
 
@@ -41,7 +33,7 @@ const makeRow = () =>
 export function PurchaseOrderPage() {
   const [rows, setRows] = useState<Record<string, string>[]>([makeRow()])
 
-  const { formRef, notice, isSaving, handleClear, handleSave } = useFormActions({
+  const { formRef, notice, isSaving, dismissNotice, handleClear, handleSave } = useFormActions({
     formType: 'purchase_order',
     getExtraPayload: () => ({ product_rows: rows }),
     resetExtraPayload: () => setRows([makeRow()]),
@@ -70,7 +62,7 @@ export function PurchaseOrderPage() {
             void handleSave()
           }}
         >
-          <NoticeBanner notice={notice} />
+          <NoticeBanner notice={notice} onDismiss={dismissNotice} />
 
           <div className="form-grid form-grid--3">
             <Field label="CARGO NO" name="cargo_no" placeholder="Cargo identification no" />
@@ -195,14 +187,6 @@ export function PurchaseOrderPage() {
           </div>
 
           <div className="purchase-footer">
-            <div className="stock-nav-buttons">
-              {stockLinks.map((item) => (
-                <Link key={item.to} to={item.to} className="stock-nav-button">
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-
             <ActionButtons
               saveLabel="SAVE PURCHASE ORDER"
               onSave={() => void handleSave()}

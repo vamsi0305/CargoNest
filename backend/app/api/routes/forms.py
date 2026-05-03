@@ -1,12 +1,12 @@
-from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlmodel import Session, select
 
+from app.api.deps.auth import get_current_user, require_csrf_token
 from app.core.database import get_session
 from app.models.form_submission import FormSubmission
+from app.models.user_account import UserAccount
 from app.schemas.forms import (
     FileUploadResponse,
     FormPrefillResponse,
@@ -14,11 +14,11 @@ from app.schemas.forms import (
     FormSubmissionRead,
     OverviewItem,
 )
+from app.services.auth import get_role_map, require_form_access
+from app.services.form_validation import validate_form_payload
+from app.services.storage import upload_attachment
 
 router = APIRouter(tags=['forms'])
-
-UPLOAD_DIR = Path('uploads')
-UPLOAD_DIR.mkdir(exist_ok=True)
 
 FORM_TABLE_KEYS = {
     'purchase_order': 'product_rows',
@@ -160,7 +160,6 @@ def merge_shared_rows(
     return merged_rows
 
 
-
 def merge_payload(existing_payload: dict[str, Any], incoming_payload: dict[str, Any]) -> dict[str, Any]:
     existing_fields = get_payload_fields(existing_payload)
     incoming_fields = get_payload_fields(incoming_payload)
@@ -171,6 +170,8 @@ def merge_payload(existing_payload: dict[str, Any], incoming_payload: dict[str, 
         'fields': {**existing_fields, **incoming_fields},
         'extra': {**existing_extra, **incoming_extra},
     }
+
+
 def build_prefill_payload(
     form_type: str, po_payload: dict[str, Any] | None, form_payload: dict[str, Any] | None
 ) -> FormPrefillResponse:
@@ -204,27 +205,35 @@ def build_prefill_payload(
             )
         elif isinstance(po_rows, list):
             merged_extra[target_table_key] = [
-                {key: row.get(key, '') for key in row.keys()} for row in po_rows if isinstance(row, dict)
+                {key: row.get(key, '') for key in row.keys()}
+                for row in po_rows
+                if isinstance(row, dict)
             ]
 
     return FormPrefillResponse(fields=merged_fields, extra=merged_extra)
 
 
+def ensure_user_can_access(
+    current_user: UserAccount,
+    session: Session,
+    access_key: str,
+) -> None:
+    role_map = get_role_map(session)
+    require_form_access(current_user, role_map, access_key)
+
+
 @router.post('/uploads', response_model=FileUploadResponse)
-async def upload_file(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail='No file selected.')
-
-    stored_name = f'{uuid4()}_{file.filename}'
-    target = UPLOAD_DIR / stored_name
-
-    content = await file.read()
-    target.write_bytes(content)
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: UserAccount = Depends(get_current_user),
+    _: None = Depends(require_csrf_token),
+):
+    stored_name, file_url = upload_attachment(file)
 
     return FileUploadResponse(
-        file_name=file.filename,
+        file_name=file.filename or stored_name,
         stored_name=stored_name,
-        file_url=f'/uploads/{stored_name}',
+        file_url=file_url,
     )
 
 
@@ -233,7 +242,11 @@ def save_form_submission(
     form_type: str,
     payload: FormSubmissionCreate,
     session: Session = Depends(get_session),
+    current_user: UserAccount = Depends(get_current_user),
+    _: None = Depends(require_csrf_token),
 ):
+    ensure_user_can_access(current_user, session, form_type)
+    validate_form_payload(form_type, payload.payload)
     fields = get_payload_fields(payload.payload)
     cargo_no = str(fields.get('cargo_no', '')).strip() or None
     record = find_latest_form_record(session, form_type, cargo_no)
@@ -256,7 +269,12 @@ def save_form_submission(
 
 
 @router.get('/forms/{form_type}', response_model=list[FormSubmissionRead])
-def list_form_submissions(form_type: str, session: Session = Depends(get_session)):
+def list_form_submissions(
+    form_type: str,
+    session: Session = Depends(get_session),
+    current_user: UserAccount = Depends(get_current_user),
+):
+    ensure_user_can_access(current_user, session, form_type)
     records = get_form_records(session, form_type)
 
     return [
@@ -271,7 +289,13 @@ def list_form_submissions(form_type: str, session: Session = Depends(get_session
 
 
 @router.get('/forms/prefill/{form_type}/{cargo_no}', response_model=FormPrefillResponse)
-def get_form_prefill(form_type: str, cargo_no: str, session: Session = Depends(get_session)):
+def get_form_prefill(
+    form_type: str,
+    cargo_no: str,
+    session: Session = Depends(get_session),
+    current_user: UserAccount = Depends(get_current_user),
+):
+    ensure_user_can_access(current_user, session, form_type)
     cleaned_cargo = cargo_no.strip()
     if not cleaned_cargo:
         return FormPrefillResponse(fields={}, extra={})
@@ -287,13 +311,24 @@ def get_form_prefill(form_type: str, cargo_no: str, session: Session = Depends(g
 
 
 @router.get('/forms/overview/all', response_model=list[OverviewItem])
-def overview_forms(session: Session = Depends(get_session)):
+def overview_forms(
+    session: Session = Depends(get_session),
+    current_user: UserAccount = Depends(get_current_user),
+):
+    ensure_user_can_access(current_user, session, 'overview')
     statement = select(FormSubmission).order_by(FormSubmission.created_at.desc())
     records = session.exec(statement).all()
+
+    role_map = get_role_map(session)
+    accessible_forms = set(current_user.allowed_forms)
+    if 'admin' in {role.name for role in role_map.values() if role.id == current_user.role_id}:
+        accessible_forms = {record.form_type for record in records}
 
     overview: list[OverviewItem] = []
 
     for record in records:
+        if record.form_type not in accessible_forms:
+            continue
         fields: dict[str, Any] = record.payload.get('fields', {})
         title = (
             fields.get('cargo_no')
@@ -311,5 +346,3 @@ def overview_forms(session: Session = Depends(get_session)):
         )
 
     return overview
-
-

@@ -1,6 +1,12 @@
-import { Navigate, createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 
+import { AuthGuard } from '../components/auth/auth-guard'
+import { HomeRedirect } from '../components/auth/home-redirect'
+import { RequireAccess } from '../components/auth/require-access'
 import { PlainLayout } from '../components/layout/plain-layout'
+import { AdminDashboardPage } from '../features/auth/admin-dashboard-page'
+import { LoginPage } from '../features/auth/login-page'
+import { SecurityPage } from '../features/auth/security-page'
 import { OverviewPage } from '../features/forms/overview-page'
 import { PurchaseOrderPage } from '../features/forms/purchase-order-page'
 import { ShipmentPage } from '../features/forms/shipment-page'
@@ -13,19 +19,103 @@ import { VehicleDetailsPage } from '../features/forms/vehicle-details-page'
 
 export const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
     path: '/',
-    element: <PlainLayout />,
+    element: (
+      <AuthGuard>
+        <PlainLayout />
+      </AuthGuard>
+    ),
     children: [
-      { index: true, element: <Navigate to="/purchase-order" replace /> },
-      { path: 'overview', element: <OverviewPage /> },
-      { path: 'purchase-order', element: <PurchaseOrderPage /> },
-      { path: 'stock-reglazing', element: <StockReglazingPage /> },
-      { path: 'stock-repacking', element: <StockRepackingPage /> },
-      { path: 'stock-sampling', element: <StockSamplingPage /> },
-      { path: 'stock-inspection', element: <StockInspectionPage /> },
-      { path: 'stock-pht', element: <StockPhtPage /> },
-      { path: 'shipment', element: <ShipmentPage /> },
-      { path: 'vehicle-details', element: <VehicleDetailsPage /> },
+      { index: true, element: <HomeRedirect /> },
+      {
+        path: 'overview',
+        element: (
+          <RequireAccess accessKey="overview">
+            <OverviewPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'purchase-order',
+        element: (
+          <RequireAccess accessKey="purchase_order">
+            <PurchaseOrderPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'stock-reglazing',
+        element: (
+          <RequireAccess accessKey="stock_reglazing">
+            <StockReglazingPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'stock-repacking',
+        element: (
+          <RequireAccess accessKey="stock_repacking">
+            <StockRepackingPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'stock-sampling',
+        element: (
+          <RequireAccess accessKey="stock_sampling">
+            <StockSamplingPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'stock-inspection',
+        element: (
+          <RequireAccess accessKey="stock_inspection">
+            <StockInspectionPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'stock-pht',
+        element: (
+          <RequireAccess accessKey="stock_pht">
+            <StockPhtPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'shipment',
+        element: (
+          <RequireAccess accessKey="shipment">
+            <ShipmentPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'vehicle-details',
+        element: (
+          <RequireAccess accessKey="vehicle_details">
+            <VehicleDetailsPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'admin-dashboard',
+        element: (
+          <RequireAccess adminOnly>
+            <AdminDashboardPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'security',
+        element: <SecurityPage />,
+      },
     ],
   },
 ])
+

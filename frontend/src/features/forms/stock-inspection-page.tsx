@@ -3,7 +3,7 @@ import { useCargoPrefill } from './use-cargo-prefill'
 import { useFormActions } from './use-form-actions'
 
 export function StockInspectionPage() {
-  const { formRef, notice, isSaving, handleClear, handleSave } = useFormActions({
+  const { formRef, notice, isSaving, dismissNotice, handleClear, handleSave } = useFormActions({
     formType: 'stock_inspection',
   })
 
@@ -25,7 +25,7 @@ export function StockInspectionPage() {
             void handleSave()
           }}
         >
-          <NoticeBanner notice={notice} />
+          <NoticeBanner notice={notice} onDismiss={dismissNotice} />
 
           <div className="section-block section-block--centered">
             <h2>Inspection</h2>

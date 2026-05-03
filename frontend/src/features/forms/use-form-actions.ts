@@ -1,13 +1,8 @@
 import { useRef, useState } from 'react'
 
 import { saveFormSubmission } from './api'
-
-type NoticeType = 'success' | 'error' | 'info'
-
-type Notice = {
-  type: NoticeType
-  text: string
-}
+import type { Notice } from './common'
+import { clearInvalidState, focusInvalidField, getValidationTarget } from './validation'
 
 type UseFormActionsOptions = {
   formType: string
@@ -36,41 +31,6 @@ function isValueEmpty(value: unknown): boolean {
   return false
 }
 
-function clearInvalidState(form: HTMLFormElement) {
-  form
-    .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('.field-control--invalid')
-    .forEach((element) => {
-      element.classList.remove('field-control--invalid')
-    })
-}
-
-function getValidationTarget(
-  element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
-  if (element.classList.contains('attach-hidden')) {
-    const attachField = element.closest('.attach-field')
-    const displayInput = attachField?.querySelector<HTMLInputElement>('.attach-display')
-    if (displayInput) {
-      return displayInput
-    }
-  }
-
-  return element
-}
-
-function markInvalid(
-  target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-) {
-  target.classList.add('field-control--invalid')
-
-  const clearHighlight = () => {
-    target.classList.remove('field-control--invalid')
-  }
-
-  target.addEventListener('input', clearHighlight, { once: true })
-  target.addEventListener('change', clearHighlight, { once: true })
-}
-
 export function useFormActions({
   formType,
   getExtraPayload,
@@ -79,11 +39,6 @@ export function useFormActions({
   const formRef = useRef<HTMLFormElement | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-
-  const setTimedNotice = (nextNotice: Notice) => {
-    setNotice(nextNotice)
-    window.setTimeout(() => setNotice(null), 2800)
-  }
 
   const collectFields = () => {
     const form = formRef.current
@@ -137,10 +92,8 @@ export function useFormActions({
 
       if (element.value.trim().length === 0) {
         const target = getValidationTarget(element)
-        markInvalid(target)
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        window.setTimeout(() => target.focus(), 120)
-        setTimedNotice({ type: 'error', text: 'Please fill all required fields.' })
+        focusInvalidField(target)
+        setNotice({ type: 'error', title: 'Required Field', text: 'Please fill all required fields.' })
         return false
       }
     }
@@ -172,7 +125,7 @@ export function useFormActions({
     }
 
     if (!hasAnyFormData()) {
-      setTimedNotice({ type: 'info', text: 'No data in form.' })
+      setNotice({ type: 'info', title: 'No Data', text: 'No data in form.' })
       return
     }
 
@@ -180,7 +133,7 @@ export function useFormActions({
     form.reset()
     clearAttachmentInputs(form)
     resetExtraPayload?.()
-    setTimedNotice({ type: 'success', text: 'Form cleared.' })
+    setNotice({ type: 'success', title: 'Form Cleared', text: 'Form cleared.' })
   }
 
   const handleSave = async () => {
@@ -199,9 +152,13 @@ export function useFormActions({
     setIsSaving(true)
     try {
       await saveFormSubmission(formType, { fields, extra })
-      setTimedNotice({ type: 'success', text: 'Form saved successfully.' })
-    } catch {
-      setTimedNotice({ type: 'error', text: 'Could not save data to database.' })
+      setNotice({ type: 'success', title: 'Saved', text: 'Form saved successfully.' })
+    } catch (error) {
+      setNotice({
+        type: 'error',
+        title: 'Save Failed',
+        text: error instanceof Error ? error.message : 'Could not save data to database.',
+      })
     } finally {
       setIsSaving(false)
     }
@@ -211,6 +168,7 @@ export function useFormActions({
     formRef,
     notice,
     isSaving,
+    dismissNotice: () => setNotice(null),
     handleClear,
     handleSave,
   }

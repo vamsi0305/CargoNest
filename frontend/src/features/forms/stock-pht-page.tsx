@@ -36,7 +36,7 @@ const makeRow = () =>
 export function StockPhtPage() {
   const [rows, setRows] = useState<Record<string, string>[]>([makeRow()])
 
-  const { formRef, notice, isSaving, handleClear, handleSave } = useFormActions({
+  const { formRef, notice, isSaving, dismissNotice, handleClear, handleSave } = useFormActions({
     formType: 'stock_pht',
     getExtraPayload: () => ({ pht_rows: rows }),
     resetExtraPayload: () => setRows([makeRow()]),
@@ -65,7 +65,7 @@ export function StockPhtPage() {
             void handleSave()
           }}
         >
-          <NoticeBanner notice={notice} />
+          <NoticeBanner notice={notice} onDismiss={dismissNotice} />
 
           <div className="form-grid form-grid--3">
             <Field label="CARGO NO" name="cargo_no" placeholder="Enter cargo number" />

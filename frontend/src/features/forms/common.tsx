@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { uploadAttachment } from './api'
 
@@ -12,6 +12,12 @@ function toFieldName(label: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
+}
+
+export type Notice = {
+  type: 'success' | 'error' | 'info'
+  text: string
+  title?: string
 }
 
 export function FormPageHeader({ title, centered = false }: FormPageHeaderProps) {
@@ -28,6 +34,164 @@ type FormSheetProps = {
 
 export function FormSheet({ children }: FormSheetProps) {
   return <section className="form-sheet">{children}</section>
+}
+
+type EditableChoiceFieldProps = {
+  label: string
+  name?: string
+  placeholder?: string
+  options?: string[]
+  className?: string
+  required?: boolean
+  defaultValue?: string
+  value?: string
+  onChange?: (value: string) => void
+  disabled?: boolean
+}
+
+export function EditableChoiceField({
+  label,
+  name,
+  placeholder,
+  options = [],
+  className,
+  required = true,
+  defaultValue,
+  value,
+  onChange,
+  disabled = false,
+}: EditableChoiceFieldProps) {
+  const resolvedName = name ?? toFieldName(label)
+  const requiredFlag = required ? 'true' : undefined
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const isControlled = value !== undefined
+  const [isOpen, setIsOpen] = useState(false)
+  const [draftValue, setDraftValue] = useState(defaultValue ?? '')
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+    }
+  }, [])
+
+  const currentValue = isControlled ? value ?? '' : draftValue
+  const normalizedFilter = currentValue.trim().toLowerCase()
+  const filteredOptions = normalizedFilter
+    ? options.filter((option) => option.toLowerCase().includes(normalizedFilter))
+    : options
+
+  const syncUncontrolledValue = (nextValue: string) => {
+    setDraftValue(nextValue)
+    if (inputRef.current) {
+      inputRef.current.value = nextValue
+      inputRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      inputRef.current.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+  }
+
+  const handleInputValue = (nextValue: string) => {
+    setIsOpen(true)
+    if (isControlled) {
+      onChange?.(nextValue)
+      return
+    }
+
+    setDraftValue(nextValue)
+  }
+
+  const handleSelectOption = (option: string) => {
+    if (isControlled) {
+      onChange?.(option)
+    } else {
+      syncUncontrolledValue(option)
+    }
+
+    setIsOpen(false)
+    window.setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const handleToggle = () => {
+    if (disabled) {
+      return
+    }
+
+    if (!isControlled) {
+      setDraftValue(inputRef.current?.value ?? '')
+    }
+
+    setIsOpen((open) => !open)
+    window.setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  return (
+    <div className={`field-group ${className ?? ''}`}>
+      <label>{label}</label>
+      <div ref={wrapperRef} className="editable-choice">
+        <div className={`editable-choice__control ${isOpen ? 'editable-choice__control--open' : ''}`}>
+          <input
+            ref={inputRef}
+            name={resolvedName}
+            placeholder={placeholder}
+            data-required={requiredFlag}
+            autoComplete="off"
+            disabled={disabled}
+            onFocus={() => {
+              if (!isControlled) {
+                setDraftValue(inputRef.current?.value ?? '')
+              }
+            }}
+            {...(isControlled
+              ? {
+                  value: value ?? '',
+                  onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+                    handleInputValue(event.target.value),
+                }
+              : {
+                  defaultValue: defaultValue ?? '',
+                  onInput: (event: React.FormEvent<HTMLInputElement>) =>
+                    handleInputValue(event.currentTarget.value),
+                })}
+          />
+          <button
+            type="button"
+            className="editable-choice__toggle"
+            onClick={handleToggle}
+            tabIndex={-1}
+            aria-label="Toggle options"
+          >
+            <span className="editable-choice__toggle-icon" aria-hidden="true" />
+          </button>
+        </div>
+
+        {isOpen ? (
+          <div className="editable-choice__menu">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className="editable-choice__option"
+                  onClick={() => handleSelectOption(option)}
+                >
+                  {option}
+                </button>
+              ))
+            ) : (
+              <div className="editable-choice__empty">No matching options. You can type your own value.</div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
 }
 
 type FieldProps = {
@@ -54,6 +218,20 @@ export function Field({
   const resolvedName = name ?? toFieldName(label)
   const requiredFlag = required ? 'true' : undefined
 
+  if (as === 'select') {
+    return (
+      <EditableChoiceField
+        label={label}
+        name={resolvedName}
+        placeholder={placeholder}
+        options={options}
+        className={className}
+        required={required}
+        defaultValue={defaultValue}
+      />
+    )
+  }
+
   return (
     <div className={`field-group ${className ?? ''}`}>
       <label>{label}</label>
@@ -65,15 +243,6 @@ export function Field({
           defaultValue={defaultValue}
           data-required={requiredFlag}
         />
-      ) : as === 'select' ? (
-        <select name={resolvedName} defaultValue={defaultValue ?? ''} data-required={requiredFlag}>
-          <option value="">{placeholder ?? 'Select'}</option>
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
       ) : (
         <input
           name={resolvedName}
@@ -173,12 +342,6 @@ type EditableTableProps = {
 }
 
 export function EditableTable({ tableName, columns, rows, onRowsChange }: EditableTableProps) {
-  const makeRow = () =>
-    columns.reduce<Record<string, string>>((acc, column) => {
-      acc[column.key] = ''
-      return acc
-    }, {})
-
   const updateCell = (rowIndex: number, key: string, value: string) => {
     const nextRows = rows.map((row, index) =>
       index === rowIndex ? { ...row, [key]: value } : row,
@@ -186,81 +349,79 @@ export function EditableTable({ tableName, columns, rows, onRowsChange }: Editab
     onRowsChange(nextRows)
   }
 
-  const addRow = () => onRowsChange([...rows, makeRow()])
-  const removeRow = () => {
-    if (rows.length <= 1) return
-    onRowsChange(rows.slice(0, -1))
-  }
-
   return (
-    <>
-      <div className="table-wrap">
-        <table className="plain-table">
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column.key}>{column.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, rowIndex) => (
-              <tr key={`${tableName}-${rowIndex}`}>
-                {columns.map((column) => {
-                  const editable = column.editable !== false
-                  return (
-                    <td key={`${tableName}-${rowIndex}-${column.key}`}>
-                      {editable ? (
-                        <input
-                          name={`${tableName}_${rowIndex}_${column.key}`}
-                          value={row[column.key] ?? ''}
-                          onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}
-                          data-required="true"
-                          className="table-input"
-                        />
-                      ) : (
-                        <input
-                          value={row[column.key] ?? ''}
-                          readOnly
-                          tabIndex={-1}
-                          className="table-input table-input--readonly"
-                        />
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
+    <div className="table-wrap">
+      <table className="plain-table">
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th key={column.key}>{column.label}</th>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="inline-actions">
-        <button type="button" className="btn btn--blue" onClick={addRow}>
-          ADD ROW
-        </button>
-        <button type="button" className="btn btn--attach" onClick={removeRow}>
-          REMOVE ROW
-        </button>
-      </div>
-    </>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={`${tableName}-${rowIndex}`}>
+              {columns.map((column) => {
+                const editable = column.editable !== false
+                return (
+                  <td key={`${tableName}-${rowIndex}-${column.key}`}>
+                    {editable ? (
+                      <input
+                        name={`${tableName}_${rowIndex}_${column.key}`}
+                        value={row[column.key] ?? ''}
+                        onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}
+                        data-required="true"
+                        className="table-input"
+                      />
+                    ) : (
+                      <input
+                        value={row[column.key] ?? ''}
+                        readOnly
+                        tabIndex={-1}
+                        className="table-input table-input--readonly"
+                      />
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
-}
-
-type Notice = {
-  type: 'success' | 'error' | 'info'
-  text: string
 }
 
 type NoticeBannerProps = {
   notice: Notice | null
+  onDismiss: () => void
 }
 
-export function NoticeBanner({ notice }: NoticeBannerProps) {
+export function NoticeBanner({ notice, onDismiss }: NoticeBannerProps) {
   if (!notice) {
     return null
   }
 
-  return <p className={`form-message form-message--${notice.type}`}>{notice.text}</p>
+  const titleByType = {
+    success: 'Success',
+    error: 'Validation',
+    info: 'Notice',
+  } as const
+
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <div className={`dialog-card dialog-card--${notice.type}`} role="alertdialog" aria-modal="true">
+        <h3>{notice.title ?? titleByType[notice.type]}</h3>
+        <p>{notice.text}</p>
+        <div className="dialog-actions">
+          <button type="button" className="btn btn--blue" onClick={onDismiss}>
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 type ActionButtonsProps = {

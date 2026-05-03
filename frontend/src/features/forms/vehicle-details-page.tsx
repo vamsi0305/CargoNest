@@ -13,7 +13,7 @@ function getCurrentTimeValue() {
 }
 
 export function VehicleDetailsPage() {
-  const { formRef, notice, isSaving, handleClear, handleSave } = useFormActions({
+  const { formRef, notice, isSaving, dismissNotice, handleClear, handleSave } = useFormActions({
     formType: 'vehicle_details',
   })
   const outTimeRef = useRef<HTMLInputElement | null>(null)
@@ -81,7 +81,7 @@ export function VehicleDetailsPage() {
             void handleSave()
           }}
         >
-          <NoticeBanner notice={notice} />
+          <NoticeBanner notice={notice} onDismiss={dismissNotice} />
 
           <div className="section-block compact-top">
             <h2>Vehicle Entry Details</h2>
