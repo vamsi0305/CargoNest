@@ -29,14 +29,26 @@ app = FastAPI(
     description='API for CargoNest export operations.',
 )
 
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Combines origins from settings (env var) with explicit Vercel preview/prod URLs.
+# To add more origins without touching code, update ALLOWED_FRONTEND_ORIGINS in
+# your Render environment variables.
+allowed_origins = list(settings.allowed_frontend_origins) + [
+    "https://cargo-nest-8jx8e53gh-velampudisaivamsivsv-8692s-projects.vercel.app",  # Vercel preview
+    "https://cargo-nest.vercel.app",   # Vercel production (update if different)
+    "http://localhost:3000",           # Local frontend dev
+    "http://localhost:5173",           # Vite dev server (if applicable)
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_frontend_origins,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
     expose_headers=['X-Request-ID'],
 )
+# ─────────────────────────────────────────────────────────────────────────────
 
 if settings.app_env == 'development':
     app.mount('/uploads', StaticFiles(directory=str(UPLOAD_DIR)), name='uploads')
