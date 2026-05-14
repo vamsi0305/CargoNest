@@ -11,6 +11,7 @@ export type AuthUser = {
 
 export type AuthSession = {
   user: AuthUser
+  csrf_token: string
 }
 
 export type Role = {

@@ -34,6 +34,7 @@ from app.services.audit import (
 )
 from app.services.auth import (
     FORM_ACCESS_OPTIONS,
+    build_csrf_token,
     create_session_token,
     delete_user_sessions,
     get_role_map,
@@ -105,7 +106,7 @@ def login(
     token = create_session_token(session, user.id or 0)
     set_auth_cookies(response, token)
     role_map = get_role_map(session)
-    return AuthSessionResponse(user=to_user_read(user, role_map))
+    return AuthSessionResponse(user=to_user_read(user, role_map), csrf_token=build_csrf_token(token))
 
 
 @router.post('/auth/logout')
@@ -137,10 +138,14 @@ def logout_all(
 @router.get('/auth/me', response_model=MeResponse)
 def me(
     current_user: UserAccount = Depends(get_current_user),
+    current_session: UserSession = Depends(get_current_session_record),
     session: Session = Depends(get_session),
 ):
     role_map = get_role_map(session)
-    return MeResponse(user=to_user_read(current_user, role_map))
+    return MeResponse(
+        user=to_user_read(current_user, role_map),
+        csrf_token=build_csrf_token(current_session.token),
+    )
 
 
 @router.post('/auth/change-password')

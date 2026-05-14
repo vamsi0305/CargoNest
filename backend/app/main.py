@@ -10,7 +10,6 @@ from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
 from app.api.routes.auth import router as auth_router
-from app.api.routes.forms import purge_legacy_demo_submissions
 from app.api.routes.forms import router as forms_router
 from app.api.routes.health import router as health_router
 from app.api.routes.purchase_orders import router as purchase_orders_router
@@ -36,6 +35,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
+    expose_headers=['X-Request-ID'],
 )
 
 if settings.app_env == 'development':
@@ -43,6 +43,14 @@ if settings.app_env == 'development':
 
 
 def validate_runtime_settings() -> None:
+    if settings.database_url.startswith('sqlite'):
+        raise RuntimeError(
+            'CargoNest requires PostgreSQL. Set DATABASE_URL to a postgresql+psycopg:// connection string.'
+        )
+    if not settings.database_url.startswith('postgresql+psycopg://'):
+        raise RuntimeError(
+            'DATABASE_URL must use the psycopg driver, for example postgresql+psycopg://user:password@host:5432/dbname.'
+        )
     if settings.app_env == 'production' and settings.session_secret_key == 'development-session-secret':
         raise RuntimeError('SESSION_SECRET_KEY must be set to a strong non-default value in production.')
 
@@ -133,7 +141,6 @@ def on_startup() -> None:
     if settings.auto_create_tables:
         create_db_and_tables()
     with Session(engine) as session:
-        purge_legacy_demo_submissions(session)
         ensure_bootstrap_admin(session)
     log_structured(logger, logging.INFO, 'application_started', environment=settings.app_env)
 

@@ -1,9 +1,22 @@
 const CSRF_COOKIE_NAME = 'cargonest_csrf'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
+function normalizeApiBaseUrl(raw: string): string {
+  return raw.trim().replace(/\/+$/, '')
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1',
+)
+
+let serverIssuedCsrf: string | null = null
 
 export function getApiBaseUrl() {
   return API_BASE_URL
+}
+
+/** Used after login /auth/me so CSRF works when the API is on a different site than the SPA (cookies are not readable cross-origin). */
+export function setServerIssuedCsrf(token: string | null) {
+  serverIssuedCsrf = token?.trim() || null
 }
 
 function readCookie(name: string) {
@@ -23,6 +36,10 @@ export function getCsrfToken() {
 }
 
 export function getCsrfHeaders(): Record<string, string> {
-  const csrfToken = getCsrfToken()
-  return csrfToken ? { 'X-CSRF-Token': csrfToken } : {}
+  const fromServer = serverIssuedCsrf
+  if (fromServer) {
+    return { 'X-CSRF-Token': fromServer }
+  }
+  const fromCookie = getCsrfToken()
+  return fromCookie ? { 'X-CSRF-Token': fromCookie } : {}
 }

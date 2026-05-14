@@ -1,9 +1,13 @@
 import os
 import unittest
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
-os.environ['DATABASE_URL'] = 'sqlite:///./test_suite.db'
+TEST_DATABASE_URL = os.environ.get(
+    'TEST_DATABASE_URL',
+    'postgresql+psycopg://postgres:postgres@localhost:5432/cargonest_test',
+)
+
+os.environ['DATABASE_URL'] = TEST_DATABASE_URL
 os.environ['AUTO_CREATE_TABLES'] = 'true'
 os.environ['APP_ENV'] = 'development'
 os.environ['BOOTSTRAP_ADMIN_ENABLED'] = 'true'
@@ -14,6 +18,8 @@ os.environ['SESSION_SECRET_KEY'] = 'test-suite-secret'
 os.environ['FRONTEND_ERROR_REPORTING_ENABLED'] = 'true'
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlmodel import SQLModel, Session, select
 
 from app.main import app
@@ -28,7 +34,25 @@ from app.services.auth import delete_user_sessions, ensure_bootstrap_admin, purg
 class ApiFlowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls.ensure_test_database()
         import_model_metadata()
+
+    @classmethod
+    def ensure_test_database(cls) -> None:
+        test_url = make_url(TEST_DATABASE_URL)
+        admin_url = test_url.set(database='postgres')
+        admin_engine = create_engine(admin_url, isolation_level='AUTOCOMMIT')
+
+        try:
+            with admin_engine.connect() as connection:
+                exists = connection.execute(
+                    text('SELECT 1 FROM pg_database WHERE datname = :database_name'),
+                    {'database_name': test_url.database},
+                ).scalar()
+                if not exists:
+                    connection.execute(text(f'CREATE DATABASE "{test_url.database}"'))
+        finally:
+            admin_engine.dispose()
 
     def setUp(self) -> None:
         SQLModel.metadata.drop_all(engine)
@@ -44,9 +68,6 @@ class ApiFlowTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         engine.dispose()
-        test_db = Path('test_suite.db')
-        if test_db.exists():
-            test_db.unlink()
 
     def login_admin(self) -> tuple[dict[str, str], dict[str, str]]:
         response = self.client.post(
@@ -56,6 +77,8 @@ class ApiFlowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         csrf = response.cookies.get('cargonest_csrf')
         self.assertTrue(csrf)
+        body = response.json()
+        self.assertEqual(body.get('csrf_token'), csrf)
         return (
             {'X-CSRF-Token': csrf},
             {'cargonest_session': response.cookies.get('cargonest_session', ''), 'cargonest_csrf': csrf},
@@ -102,6 +125,8 @@ class ApiFlowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         csrf = response.cookies.get('cargonest_csrf')
         self.assertTrue(csrf)
+        body = response.json()
+        self.assertEqual(body.get('csrf_token'), csrf)
         return (
             {'X-CSRF-Token': csrf},
             {'cargonest_session': response.cookies.get('cargonest_session', ''), 'cargonest_csrf': csrf},
@@ -122,6 +147,7 @@ class ApiFlowTests(unittest.TestCase):
         payload = me.json()
         self.assertEqual(payload['user']['email'], 'admin@example.com')
         self.assertEqual(payload['user']['role_name'], 'admin')
+        self.assertEqual(payload.get('csrf_token'), response.cookies.get('cargonest_csrf'))
 
     def test_admin_can_create_and_update_user_and_audit_log_is_written(self) -> None:
         headers, cookies = self.login_admin()
@@ -183,6 +209,26 @@ class ApiFlowTests(unittest.TestCase):
 
     def test_session_cleanup_removes_expired_records_without_touching_active_ones(self) -> None:
         with Session(engine) as session:
+            user_role = session.exec(select(Role).where(Role.name == 'user')).first()
+            if user_role is None:
+                user_role = Role(name='user', description='Standard user', is_system=True)
+                session.add(user_role)
+                session.commit()
+                session.refresh(user_role)
+
+            other_user = UserAccount(
+                username='session-worker',
+                email='session-worker@example.com',
+                password_hash='test-hash',
+                password_salt='test-salt',
+                role_id=user_role.id,
+                allowed_forms=['overview'],
+                is_active=True,
+            )
+            session.add(other_user)
+            session.commit()
+            session.refresh(other_user)
+
             active_session = UserSession(
                 user_id=1,
                 token='active-token',
@@ -194,7 +240,7 @@ class ApiFlowTests(unittest.TestCase):
                 expires_at=datetime.now(UTC) - timedelta(minutes=5),
             )
             other_user_session = UserSession(
-                user_id=2,
+                user_id=other_user.id or 0,
                 token='other-token',
                 expires_at=datetime.now(UTC) + timedelta(hours=2),
             )
@@ -224,6 +270,9 @@ class ApiFlowTests(unittest.TestCase):
 
         forbidden = self.client.get('/api/v1/forms/shipment', cookies=user_cookies)
         self.assertEqual(forbidden.status_code, 403, forbidden.text)
+
+        purchase_orders_forbidden = self.client.get('/api/v1/purchase-orders', cookies=user_cookies)
+        self.assertEqual(purchase_orders_forbidden.status_code, 403, purchase_orders_forbidden.text)
 
         allowed = self.client.get('/api/v1/forms/overview/all', cookies=user_cookies)
         self.assertEqual(allowed.status_code, 200, allowed.text)
@@ -278,6 +327,7 @@ class ApiFlowTests(unittest.TestCase):
 
         save_po = self.client.post('/api/v1/forms/purchase_order', headers=headers, cookies=cookies, json=purchase_order_payload)
         self.assertEqual(save_po.status_code, 200, save_po.text)
+        purchase_order_id = save_po.json()['id']
 
         reglazing_payload = {
             'payload': {
@@ -318,6 +368,21 @@ class ApiFlowTests(unittest.TestCase):
             json=reglazing_payload,
         )
         self.assertEqual(save_reglazing.status_code, 200, save_reglazing.text)
+
+        purchase_orders = self.client.get('/api/v1/purchase-orders', cookies=cookies)
+        self.assertEqual(purchase_orders.status_code, 200, purchase_orders.text)
+        queue_payload = purchase_orders.json()
+        self.assertEqual(queue_payload['metrics']['active_orders'], 1)
+        self.assertEqual(queue_payload['items'][0]['id'], str(purchase_order_id))
+        self.assertEqual(queue_payload['items'][0]['status'], 'processing')
+        self.assertEqual(queue_payload['items'][0]['progress'], 50)
+        self.assertEqual(queue_payload['items'][0]['total_quantity_kg'], 1000.0)
+
+        purchase_order_detail = self.client.get(f'/api/v1/purchase-orders/{purchase_order_id}', cookies=cookies)
+        self.assertEqual(purchase_order_detail.status_code, 200, purchase_order_detail.text)
+        detail_payload = purchase_order_detail.json()
+        self.assertEqual(detail_payload['cargo_no'], 'CGN-9001')
+        self.assertEqual(detail_payload['shipment_target'], 'Tokyo Warehouse')
 
         prefill = self.client.get('/api/v1/forms/prefill/stock_reglazing/CGN-9001', cookies=cookies)
         self.assertEqual(prefill.status_code, 200, prefill.text)

@@ -15,6 +15,7 @@ Current platform includes:
 - login throttling and password/session management flows
 - admin audit logging for role and user management actions
 - backend request/error logging with frontend error reporting
+- PostgreSQL-only database configuration for local and production environments
 
 ## Environment Files
 
@@ -23,12 +24,18 @@ Development:
 - `frontend/.env.example`
 - `backend/.env.example`
 
+Local backend development expects PostgreSQL, not SQLite. The default local connection in
+`backend/.env.example` points to `postgresql+psycopg://postgres:postgres@localhost:5432/cargonest`.
+Create that database locally before starting the API if it does not already exist.
+
 Production templates:
 
 - `frontend/.env.production.example`
 - `backend/.env.production.example`
 
 ## Production Checklist
+
+See [DEPLOY.md](DEPLOY.md) for a **step-by-step free-tier live setup** (Vercel + Render + Supabase) including the first-admin bootstrap.
 
 1. Set `VITE_API_BASE_URL` in Vercel to your Render backend URL.
 2. Set backend `FRONTEND_ORIGIN` and `FRONTEND_ORIGINS` to your exact Vercel domain.
@@ -60,6 +67,9 @@ Production templates:
 From `backend/`:
 
 - Run API flow tests: `venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v`
+
+Test runs now use PostgreSQL as well. Override `TEST_DATABASE_URL` if your local Postgres credentials or
+database name differ from the default `postgresql+psycopg://postgres:postgres@localhost:5432/cargonest_test`.
 
 Current automated coverage includes:
 

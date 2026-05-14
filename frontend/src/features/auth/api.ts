@@ -1,4 +1,4 @@
-import { getApiBaseUrl, getCsrfHeaders } from './session'
+import { getApiBaseUrl, getCsrfHeaders, setServerIssuedCsrf } from './session'
 import type { AdminAuditLog, AuthSession, AuthUser, Role } from './types'
 import { buildApiErrorMessage, reportAsyncError } from '../../lib/monitoring'
 
@@ -41,7 +41,14 @@ export async function loginRequest(email: string, password: string) {
     await readApiError(response, 'Invalid login credentials.')
   }
 
-  return response.json() as Promise<AuthSession>
+  const session = (await response.json()) as AuthSession
+  setServerIssuedCsrf(session.csrf_token)
+  return session
+}
+
+export type MePayload = {
+  user: AuthUser
+  csrf_token: string
 }
 
 export async function fetchMe() {
@@ -53,7 +60,9 @@ export async function fetchMe() {
     await readApiError(response, 'Session expired.')
   }
 
-  return response.json() as Promise<{ user: AuthUser }>
+  const payload = (await response.json()) as MePayload
+  setServerIssuedCsrf(payload.csrf_token)
+  return payload
 }
 
 export async function logoutRequest() {
@@ -66,6 +75,7 @@ export async function logoutRequest() {
   if (!response.ok) {
     await readApiError(response, 'Unable to log out.')
   }
+  setServerIssuedCsrf(null)
 }
 
 export async function fetchRoles() {
@@ -172,6 +182,7 @@ export async function logoutAllRequest() {
   if (!response.ok) {
     await readApiError(response, 'Unable to end all sessions.')
   }
+  setServerIssuedCsrf(null)
 }
 
 export async function changePasswordRequest(currentPassword: string, newPassword: string) {
@@ -189,6 +200,7 @@ export async function changePasswordRequest(currentPassword: string, newPassword
     await readApiError(response, 'Unable to change password.')
   }
 
+  setServerIssuedCsrf(null)
   return response.json() as Promise<{ success: boolean; message: string }>
 }
 

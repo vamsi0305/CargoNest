@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,7 +14,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ''
     supabase_storage_bucket: str = 'cargonest-attachments'
     supabase_storage_folder: str = 'forms'
-    database_url: str = 'sqlite:///./cargonest.db'
+    database_url: str = 'postgresql+psycopg://postgres:postgres@localhost:5432/cargonest'
     auto_create_tables: bool = True
     log_level: str = 'INFO'
     frontend_error_reporting_enabled: bool = True
@@ -26,6 +27,19 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str = ''
     bootstrap_admin_password: str = ''
 
+    @field_validator('database_url', mode='before')
+    @classmethod
+    def coerce_postgres_to_psycopg(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        if value.startswith('postgresql+psycopg://'):
+            return value
+        if value.startswith('postgres://'):
+            return 'postgresql+psycopg://' + value[len('postgres://') :]
+        if value.startswith('postgresql://'):
+            return 'postgresql+psycopg://' + value[len('postgresql://') :]
+        return value
+
     model_config = SettingsConfigDict(
         env_file='.env',
         env_file_encoding='utf-8',
@@ -35,9 +49,13 @@ class Settings(BaseSettings):
 
     @property
     def allowed_frontend_origins(self) -> list[str]:
-        origins = [origin.strip() for origin in self.frontend_origins.split(',') if origin.strip()]
-        if self.frontend_origin and self.frontend_origin not in origins:
-            origins.append(self.frontend_origin)
+        def norm(origin: str) -> str:
+            return origin.strip().rstrip('/')
+
+        origins = [norm(o) for o in self.frontend_origins.split(',') if o.strip()]
+        primary = norm(self.frontend_origin) if self.frontend_origin.strip() else ''
+        if primary and primary not in origins:
+            origins.append(primary)
         return origins or ['http://localhost:5173', 'http://127.0.0.1:5173']
 
     @property

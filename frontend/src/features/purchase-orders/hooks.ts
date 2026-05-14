@@ -13,5 +13,6 @@ export function usePurchaseOrder(orderId: string) {
   return useQuery({
     queryKey: ['purchase-order', orderId],
     queryFn: () => fetchPurchaseOrder(orderId),
+    enabled: orderId.length > 0,
   })
 }

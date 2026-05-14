@@ -10,6 +10,7 @@ export type PageLink = {
 export const pageLinks: PageLink[] = [
   { to: '/overview', label: 'OVERVIEW', accessKey: 'overview' },
   { to: '/purchase-order', label: 'PURCHASE ORDER', accessKey: 'purchase_order' },
+  { to: '/purchase-orders', label: 'PURCHASE QUEUE', accessKey: 'purchase_order' },
   { to: '/stock-reglazing', label: 'STOCK - REGLAZING', accessKey: 'stock_reglazing' },
   { to: '/stock-repacking', label: 'STOCK - REPACKING', accessKey: 'stock_repacking' },
   { to: '/stock-sampling', label: 'STOCK - SAMPLING', accessKey: 'stock_sampling' },

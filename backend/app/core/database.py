@@ -4,11 +4,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.core.config import settings
 
-engine_kwargs: dict = {'echo': False}
-if settings.database_url.startswith('sqlite'):
-    engine_kwargs['connect_args'] = {'check_same_thread': False}
-
-engine = create_engine(settings.database_url, **engine_kwargs)
+engine = create_engine(settings.database_url, echo=False)
 
 
 def import_model_metadata() -> None:

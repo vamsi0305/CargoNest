@@ -115,10 +115,12 @@ class UserRead(BaseModel):
 
 class AuthSessionResponse(BaseModel):
     user: UserRead
+    csrf_token: str
 
 
 class MeResponse(BaseModel):
     user: UserRead
+    csrf_token: str
 
 
 class FormAccessOptionsResponse(BaseModel):

@@ -16,6 +16,8 @@ import { StockReglazingPage } from '../features/forms/stock-reglazing-page'
 import { StockRepackingPage } from '../features/forms/stock-repacking-page'
 import { StockSamplingPage } from '../features/forms/stock-sampling-page'
 import { VehicleDetailsPage } from '../features/forms/vehicle-details-page'
+import { PurchaseOrderDetailPage } from '../features/purchase-orders/purchase-order-detail-page'
+import { PurchaseOrdersPage } from '../features/purchase-orders/purchase-orders-page'
 
 export const router = createBrowserRouter([
   {
@@ -44,6 +46,22 @@ export const router = createBrowserRouter([
         element: (
           <RequireAccess accessKey="purchase_order">
             <PurchaseOrderPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'purchase-orders',
+        element: (
+          <RequireAccess accessKey="purchase_order">
+            <PurchaseOrdersPage />
+          </RequireAccess>
+        ),
+      },
+      {
+        path: 'purchase-orders/:orderId',
+        element: (
+          <RequireAccess accessKey="purchase_order">
+            <PurchaseOrderDetailPage />
           </RequireAccess>
         ),
       },

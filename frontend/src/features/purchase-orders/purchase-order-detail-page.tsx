@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 
 import { StatusBadge } from '../../components/ui/status-badge'
+import { FormPageHeader, FormSheet } from '../forms/common'
 import { usePurchaseOrder } from './hooks'
 
 export function PurchaseOrderDetailPage() {
@@ -8,77 +9,95 @@ export function PurchaseOrderDetailPage() {
   const { data, isLoading, isError } = usePurchaseOrder(orderId)
 
   if (isLoading) {
-    return <section className="panel">Loading purchase order details...</section>
+    return (
+      <main className="page-canvas">
+        <FormPageHeader title="Purchase Order Detail" />
+        <FormSheet>
+          <p className="muted-copy">Loading purchase order details...</p>
+        </FormSheet>
+      </main>
+    )
   }
 
   if (isError || !data) {
     return (
-      <section className="panel panel--error">
-        Purchase order details are unavailable right now.
-      </section>
+      <main className="page-canvas">
+        <FormPageHeader title="Purchase Order Detail" />
+        <FormSheet>
+          <p className="muted-copy">Purchase order details are unavailable right now.</p>
+        </FormSheet>
+      </main>
     )
   }
 
   return (
-    <div className="detail-layout">
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Purchase order record</p>
-            <h2>
-              {data.cargo_no} / {data.po_no}
-            </h2>
+    <main className="page-canvas">
+      <FormPageHeader title="Purchase Order Detail" />
+      <FormSheet>
+        <div className="section-block compact-top">
+          <div className="detail-heading">
+            <div>
+              <h2>
+                {data.cargo_no} / {data.po_no}
+              </h2>
+              <p className="muted-copy">Operational detail derived from the saved form workflow.</p>
+            </div>
+            <StatusBadge status={data.status} />
           </div>
-          <StatusBadge status={data.status} />
-        </div>
 
-        <div className="detail-grid">
-          <div>
-            <span>Buyer</span>
-            <strong>{data.buyer}</strong>
-          </div>
-          <div>
-            <span>Agent</span>
-            <strong>{data.agent_name}</strong>
-          </div>
-          <div>
-            <span>Destination</span>
-            <strong>{data.destination}</strong>
-          </div>
-          <div>
-            <span>PO Date</span>
-            <strong>{data.po_date}</strong>
-          </div>
-          <div>
-            <span>Total Quantity</span>
-            <strong>{data.total_quantity_kg.toLocaleString()} kg</strong>
-          </div>
-          <div>
-            <span>Shipment Target</span>
-            <strong>{data.shipment_target}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Workflow readiness</p>
-            <h3>Next implementation slices</h3>
+          <div className="detail-grid">
+            <div className="detail-card">
+              <span>Buyer</span>
+              <strong>{data.buyer}</strong>
+            </div>
+            <div className="detail-card">
+              <span>Agent</span>
+              <strong>{data.agent_name}</strong>
+            </div>
+            <div className="detail-card">
+              <span>Destination</span>
+              <strong>{data.destination}</strong>
+            </div>
+            <div className="detail-card">
+              <span>PO Date</span>
+              <strong>{data.po_date}</strong>
+            </div>
+            <div className="detail-card">
+              <span>Total Quantity</span>
+              <strong>{data.total_quantity_kg.toLocaleString()} kg</strong>
+            </div>
+            <div className="detail-card">
+              <span>Shipment Target</span>
+              <strong>{data.shipment_target}</strong>
+            </div>
           </div>
         </div>
 
-        <ul className="check-list">
-          <li>Reglazing and repacking job rows linked to PO products</li>
-          <li>Sampling, inspection, and PHT compliance stages</li>
-          <li>Shipment creation and reefer logistics tracking</li>
-          <li>Vehicle gate entries, documents, and temperature logs</li>
-        </ul>
+        <div className="section-block">
+          <div className="detail-heading">
+            <div>
+              <p className="muted-copy">Workflow readiness</p>
+              <h2>What this purchase order has unlocked</h2>
+            </div>
+          </div>
 
-        <Link className="secondary-link" to="/purchase-orders">
-          Back to purchase orders
-        </Link>
-      </section>
-    </div>
+          <ul className="check-list">
+            <li>Purchase order data is now visible from the saved backend records.</li>
+            <li>Progress reflects downstream form activity across processing, inspection, and shipment.</li>
+            <li>Shipment target is pulled from ETA or destination details when available.</li>
+            <li>Queue access respects the same authenticated permissions as the rest of the app.</li>
+          </ul>
+
+          <div className="inline-actions">
+            <Link className="btn btn--attach btn--small" to="/purchase-orders">
+              Back to Queue
+            </Link>
+            <Link className="btn btn--blue btn--small" to="/purchase-order">
+              Open PO Form
+            </Link>
+          </div>
+        </div>
+      </FormSheet>
+    </main>
   )
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import { changePasswordRequest, fetchMe, loginRequest, logoutAllRequest, logoutRequest } from './api'
+import { setServerIssuedCsrf } from './session'
 import type { AuthUser } from './types'
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
@@ -24,6 +25,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const payload = await fetchMe()
       set({ user: payload.user, status: 'authenticated' })
     } catch {
+      setServerIssuedCsrf(null)
       set({ user: null, status: 'unauthenticated' })
     }
   },
@@ -39,17 +41,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Ignore logout request failures and still clear local session state.
       }
     }
+    setServerIssuedCsrf(null)
     set({ user: null, status: 'unauthenticated' })
   },
   logoutAll: async () => {
     if (get().status === 'authenticated') {
       await logoutAllRequest()
     }
+    setServerIssuedCsrf(null)
     set({ user: null, status: 'unauthenticated' })
   },
   changePassword: async (currentPassword: string, newPassword: string) => {
     await changePasswordRequest(currentPassword, newPassword)
     set({ user: null, status: 'unauthenticated' })
   },
-  clearSession: () => set({ user: null, status: 'unauthenticated' }),
+  clearSession: () => {
+    setServerIssuedCsrf(null)
+    set({ user: null, status: 'unauthenticated' })
+  },
 }))
